@@ -4,7 +4,9 @@ from dml.learners.base import BaseNuisanceLearner
 from dml.learners.lasso import LassoLearner
 from dml.learners.elastic_net import ElasticNetLearner
 from dml.learners.random_forest import RandomForestLearner
+from dml.learners.neural_net import NeuralNetLearner
 from dml.learners.causal_forest import CausalForestLearner
+
 
 @pytest.fixture
 def sample_data():
@@ -15,11 +17,13 @@ def sample_data():
     y = X @ np.ones(p) + np.random.randn(n)
     return X, y
 
+
 @pytest.mark.parametrize("learner", [
     LassoLearner(),
     ElasticNetLearner(),
     RandomForestLearner(),
     CausalForestLearner(),
+    NeuralNetLearner(),
 ])
 def test_learner_is_base_instance(learner):
     """All learners must be instances of BaseNuisanceLearner."""
@@ -31,6 +35,7 @@ def test_learner_is_base_instance(learner):
     ElasticNetLearner(),
     RandomForestLearner(),
     CausalForestLearner(),
+    NeuralNetLearner(),
 ])
 def test_learner_has_fit_predict(learner):
     """All learners must have fit() and predict() methods."""
@@ -38,11 +43,13 @@ def test_learner_has_fit_predict(learner):
     assert hasattr(learner, "predict")
     assert hasattr(learner, "fit_predict")
 
+
 @pytest.mark.parametrize("learner", [
     LassoLearner(),
     ElasticNetLearner(),
     RandomForestLearner(),
     CausalForestLearner(),
+    NeuralNetLearner(),
 ])
 def test_predict_output_shape(learner, sample_data):
     """predict() must return a 1D array of shape (n,)."""
@@ -50,6 +57,7 @@ def test_predict_output_shape(learner, sample_data):
     learner.fit(X, y)
     y_pred = learner.predict(X)
     assert y_pred.shape == (len(y),)
+
 
 @pytest.mark.parametrize("learner", [
     LassoLearner(),
@@ -62,20 +70,26 @@ def test_fit_predict_reduces_error(learner, sample_data):
     X, y = sample_data
     learner.fit(X, y)
     y_pred = learner.predict(X)
-    
     mse_model = np.mean((y - y_pred) ** 2)
     mse_baseline = np.mean((y - np.mean(y)) ** 2)
-    
     assert mse_model < mse_baseline
+
+
+def test_nn_fit_predict_runs(sample_data):
+    """NN only needs to run without error, return correct shape and finite values."""
+    X, y = sample_data
+    learner = NeuralNetLearner()
+    learner.fit(X, y)
+    y_pred = learner.predict(X)
+    assert y_pred.shape == (len(y),)
+    assert np.all(np.isfinite(y_pred))
 
 
 def test_fit_predict_method(sample_data):
     """fit_predict() should return same shape as predict()."""
     X, y = sample_data
-    n = len(y)
     X_train, X_test = X[:80], X[80:]
     y_train = y[:80]
-    
     learner = LassoLearner()
     result = learner.fit_predict(X_train, y_train, X_test)
     assert result.shape == (20,)
