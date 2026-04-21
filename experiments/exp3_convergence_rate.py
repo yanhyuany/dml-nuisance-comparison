@@ -9,7 +9,6 @@ from dml.learners.elastic_net import ElasticNetLearner
 from dml.utils.cross_fitting import cross_fit
 from dml.models.plr import PLR
 
-# main learners
 LEARNERS = {
     "Lasso": LassoLearner,
     "RandomForest": RandomForestLearner,
@@ -25,23 +24,13 @@ ALPHA = 0.5
 N_REPS = 100
 
 
-# ---------------------------------------------------------------------------
-# True nuisance functions from CCDDHNR2018
-# ---------------------------------------------------------------------------
-
 def g0_true(X):
-    """E[Y|X] = exp(X1)/(1+exp(X1)) + 0.25*X3"""
     return np.exp(X[:, 0]) / (1 + np.exp(X[:, 0])) + 0.25 * X[:, 2]
 
 
 def m0_true(X):
-    """E[D|X] = X1 + 0.25*exp(X3)/(1+exp(X3))"""
     return X[:, 0] + 0.25 * np.exp(X[:, 2]) / (1 + np.exp(X[:, 2]))
 
-
-# ---------------------------------------------------------------------------
-# Generate data
-# ---------------------------------------------------------------------------
 
 def generate_data(n_obs: int, alpha: float = ALPHA, random_state: int = None):
     np.random.seed(random_state)
@@ -51,25 +40,16 @@ def generate_data(n_obs: int, alpha: float = ALPHA, random_state: int = None):
     return X, Y, D
 
 
-# ---------------------------------------------------------------------------
-# Exp 3a: Nuisance RMSE vs n
-# ---------------------------------------------------------------------------
-
 def run_nuisance_rmse(learner_class, n_obs: int, random_state: int) -> dict:
-    """Run one rep: compute nuisance RMSE for g0 and m0."""
     X, Y, D = generate_data(n_obs, random_state=random_state)
-
     g_hat = cross_fit(learner_class(), X, Y, n_splits=5, random_state=random_state)
     m_hat = cross_fit(learner_class(), X, D, n_splits=5, random_state=random_state)
-
     rmse_g = np.sqrt(np.mean((g_hat - g0_true(X)) ** 2))
     rmse_m = np.sqrt(np.mean((m_hat - m0_true(X)) ** 2))
-
     return {"rmse_g": rmse_g, "rmse_m": rmse_m}
 
 
 def run_exp3a(n_reps: int = N_REPS, learners: dict = None) -> pd.DataFrame:
-    """Exp 3a: nuisance RMSE vs n for each learner."""
     if learners is None:
         learners = LEARNERS
 
@@ -78,7 +58,6 @@ def run_exp3a(n_reps: int = N_REPS, learners: dict = None) -> pd.DataFrame:
         for n_obs in N_VALUES:
             print(f"[{learner_name}] n={n_obs}...")
             rmse_g_list, rmse_m_list = [], []
-
             for rep in range(n_reps):
                 try:
                     res = run_nuisance_rmse(learner_class, n_obs, random_state=rep)
@@ -86,23 +65,16 @@ def run_exp3a(n_reps: int = N_REPS, learners: dict = None) -> pd.DataFrame:
                     rmse_m_list.append(res["rmse_m"])
                 except Exception:
                     continue
-
             records.append({
                 "learner": learner_name,
                 "n_obs": n_obs,
                 "rmse_g": np.mean(rmse_g_list),
                 "rmse_m": np.mean(rmse_m_list),
             })
-
     return pd.DataFrame(records)
 
 
-# ---------------------------------------------------------------------------
-# Exp 3b: theta RMSE vs n
-# ---------------------------------------------------------------------------
-
 def run_theta_rmse(learner_class, n_obs: int, random_state: int) -> float:
-    """Run one rep: compute squared error of theta."""
     X, Y, D = generate_data(n_obs, random_state=random_state)
     plr = PLR(learner=learner_class(), n_splits=5, random_state=random_state)
     plr.fit(Y, D, X)
@@ -111,7 +83,6 @@ def run_theta_rmse(learner_class, n_obs: int, random_state: int) -> float:
 
 
 def run_exp3b(n_reps: int = N_REPS, learners: dict = None) -> pd.DataFrame:
-    """Exp 3b: theta RMSE vs n for each learner."""
     if learners is None:
         learners = LEARNERS
 
@@ -120,41 +91,28 @@ def run_exp3b(n_reps: int = N_REPS, learners: dict = None) -> pd.DataFrame:
         for n_obs in N_VALUES:
             print(f"[{learner_name}] n={n_obs}...")
             sq_errors = []
-
             for rep in range(n_reps):
                 try:
                     se = run_theta_rmse(learner_class, n_obs, random_state=rep)
                     sq_errors.append(se)
                 except Exception:
                     continue
-
             records.append({
                 "learner": learner_name,
                 "n_obs": n_obs,
                 "rmse_theta": np.sqrt(np.mean(sq_errors)),
             })
-
     return pd.DataFrame(records)
 
 
-# ---------------------------------------------------------------------------
-# Estimate convergence slope
-# ---------------------------------------------------------------------------
-
 def estimate_slope(n_values, rmse_values) -> float:
-    """Estimate convergence rate via log-log OLS."""
     log_n = np.log(np.array(n_values, dtype=float))
     log_rmse = np.log(np.array(rmse_values, dtype=float))
     slope, _ = np.polyfit(log_n, log_rmse, 1)
     return slope
 
 
-# ---------------------------------------------------------------------------
-# Plotting
-# ---------------------------------------------------------------------------
-
 def plot_exp3a(df: pd.DataFrame, save_path: str = None):
-    """Plot nuisance RMSE vs n with n^{-1/4} reference line."""
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
     learner_colors = {
@@ -178,7 +136,6 @@ def plot_exp3a(df: pd.DataFrame, save_path: str = None):
                       marker='o', color=color,
                       label=f"{learner_name} (slope={slope:.2f})")
 
-        # n^{-1/4} reference line, calibrated to first n
         ref_n = np.array(N_VALUES, dtype=float)
         first_vals = df[df["learner"] == list(df["learner"].unique())[0]]
         c = first_vals[nuisance].values[0] * N_VALUES[0] ** 0.25
@@ -198,7 +155,6 @@ def plot_exp3a(df: pd.DataFrame, save_path: str = None):
 
 
 def plot_exp3b(df: pd.DataFrame, save_path: str = None):
-    """Plot theta RMSE vs n with n^{-1/2} reference line."""
     fig, ax = plt.subplots(figsize=(8, 5))
 
     learner_colors = {
@@ -217,7 +173,6 @@ def plot_exp3b(df: pd.DataFrame, save_path: str = None):
                   marker='o', color=color,
                   label=f"{learner_name} (slope={slope:.2f})")
 
-    # n^{-1/2} reference line
     ref_n = np.array(N_VALUES, dtype=float)
     first = df[df["learner"] == list(df["learner"].unique())[0]]
     c = first["rmse_theta"].values[0] * N_VALUES[0] ** 0.5

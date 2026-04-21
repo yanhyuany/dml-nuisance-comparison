@@ -4,12 +4,6 @@ from ..utils.variance import compute_variance, confidence_interval
 
 
 class PLR:
-    """
-    Partially Linear Regression via Double/Debiased ML.
-    
-    Model: Y = theta * D + g(X) + epsilon
-    Estimates theta using cross-fitting and partialling-out.
-    """
 
     def __init__(self, learner, n_splits: int = 5, random_state: int = 66):
         self.learner = learner

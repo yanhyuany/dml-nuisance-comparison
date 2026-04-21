@@ -6,10 +6,6 @@ from .base import BaseNuisanceLearner
 
 
 class _MLP(nn.Module):
-    """
-    Simple fully-connected network with ReLU activations.
-    Layer sizes are specified dynamically.
-    """
 
     def __init__(self, input_dim: int, hidden_sizes: list, output_dim: int = 1,
                  dropout: float = 0.0):
@@ -30,12 +26,6 @@ class _MLP(nn.Module):
 
 
 class NeuralNetLearner(BaseNuisanceLearner):
-    """
-    PyTorch neural network as a nuisance learner.
-    Architecture is specified dynamically via hidden_sizes.
-    Default: 64 -> 32 -> 1, ReLU, no output activation.
-    Uses early stopping to avoid overfitting.
-    """
 
     def __init__(
         self,
@@ -62,6 +52,9 @@ class NeuralNetLearner(BaseNuisanceLearner):
 
         n, input_dim = X.shape
 
+        idx = np.random.permutation(n)
+        X, y = X[idx], y[idx]
+
         n_val = max(1, int(n * self.val_frac))
         n_train = n - n_val
         X_train, X_val = X[:n_train], X[n_train:]
@@ -82,9 +75,9 @@ class NeuralNetLearner(BaseNuisanceLearner):
 
         for epoch in range(self.max_epochs):
             self.model.train()
-            idx = torch.randperm(n_train)
+            idx_t = torch.randperm(n_train)
             for start in range(0, n_train, self.batch_size):
-                batch_idx = idx[start:start + self.batch_size]
+                batch_idx = idx_t[start:start + self.batch_size]
                 loss = loss_fn(self.model(X_train_t[batch_idx]),
                                y_train_t[batch_idx])
                 optimizer.zero_grad()
@@ -119,14 +112,6 @@ class NeuralNetLearner(BaseNuisanceLearner):
 
 
 class TunedNeuralNetLearner(BaseNuisanceLearner):
-    """
-    Neural Network with Farrell et al. (2021) architecture:
-    - depth = floor(log(n))
-    - width = floor(n^{1/(2+p/n)})
-    - dropout for regularization
-    - random validation split (shuffled)
-    Reference: Farrell, Liang, Misra (2021), Econometrica.
-    """
 
     def __init__(
         self,
@@ -148,7 +133,6 @@ class TunedNeuralNetLearner(BaseNuisanceLearner):
         self.model = None
 
     def _farrell_architecture(self, n: int, p: int) -> list:
-        """Farrell et al. (2021) architecture formula."""
         depth = max(1, int(math.log(n)))
         width = max(8, int(n ** (1 / (2 + p / n))))
         return [width] * depth
@@ -160,7 +144,6 @@ class TunedNeuralNetLearner(BaseNuisanceLearner):
         n, p = X.shape
         hidden_sizes = self._farrell_architecture(n, p)
 
-        # random shuffle before train/val split
         idx = np.random.permutation(n)
         X, y = X[idx], y[idx]
 

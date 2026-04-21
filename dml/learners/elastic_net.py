@@ -2,11 +2,8 @@ import numpy as np
 from sklearn.linear_model import ElasticNet
 from .base import BaseNuisanceLearner
 
+
 class ElasticNetLearner(BaseNuisanceLearner):
-    """
-    ElasticNet regression learner (L1 + L2 regularization).
-    Default alpha=0.1, l1_ratio=0.5.
-    """
 
     def __init__(self, alpha: float = 0.1, l1_ratio: float = 0.5):
         self.alpha = alpha

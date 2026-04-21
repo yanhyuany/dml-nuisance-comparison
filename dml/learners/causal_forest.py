@@ -2,12 +2,8 @@ import numpy as np
 from econml.grf import RegressionForest
 from .base import BaseNuisanceLearner
 
+
 class CausalForestLearner(BaseNuisanceLearner):
-    """
-    Regression Forest learner from econml.
-    Used as a nuisance learner in DML pipeline.
-    Default n_estimators=100, random_state=42.
-    """
 
     def __init__(self, n_estimators: int = 100, random_state: int = 42):
         self.n_estimators = n_estimators
@@ -16,7 +12,7 @@ class CausalForestLearner(BaseNuisanceLearner):
             n_estimators=self.n_estimators,
             random_state=self.random_state
         )
-    
+
     def fit(self, X: np.ndarray, y: np.ndarray) -> "CausalForestLearner":
         self.model.fit(X, y)
         return self

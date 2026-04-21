@@ -4,10 +4,6 @@ from .base import BaseNuisanceLearner
 
 
 class LassoLearner(BaseNuisanceLearner):
-    """
-    Lasso regression learner (L1 regularization).
-    Default alpha=0.1.
-    """
 
     def __init__(self, alpha: float = 0.1):
         self.alpha = alpha
@@ -22,10 +18,6 @@ class LassoLearner(BaseNuisanceLearner):
 
 
 class TunedLassoLearner(BaseNuisanceLearner):
-    """
-    Lasso with automatic alpha selection via cross-validation (LassoCV).
-    Searches over a log-scale grid of alpha values.
-    """
 
     def __init__(self, cv: int = 5):
         self.cv = cv

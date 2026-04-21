@@ -5,10 +5,6 @@ from .base import BaseNuisanceLearner
 
 
 class RandomForestLearner(BaseNuisanceLearner):
-    """
-    Random Forest regression learner.
-    Default n_estimators=100, random_state=42.
-    """
 
     def __init__(self, n_estimators: int = 100, random_state: int = 42):
         self.n_estimators = n_estimators
@@ -27,10 +23,6 @@ class RandomForestLearner(BaseNuisanceLearner):
 
 
 class TunedRandomForestLearner(BaseNuisanceLearner):
-    """
-    Random Forest with GridSearchCV over max_depth and max_features.
-    Reference: Bach et al. (2024).
-    """
 
     def __init__(self, n_estimators: int = 100, random_state: int = 42):
         self.n_estimators = n_estimators

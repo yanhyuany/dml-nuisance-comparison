@@ -3,14 +3,8 @@ import jax
 import jax.numpy as jnp
 
 
-# ── PLR Score ────────────────────────────────────────────────────────────────
-
 def plr_score_full(theta: float, Y: jnp.ndarray, D: jnp.ndarray,
                    l_hat: jnp.ndarray, m_hat: jnp.ndarray) -> float:
-    """
-    PLR partialling-out score (Score 4.4 in Chernozhukov et al. 2018).
-    psi = (D - m(X)) * (Y - l(X) - theta * (D - m(X)))
-    """
     D_tilde = D - m_hat
     Y_tilde = Y - l_hat
     psi = D_tilde * (Y_tilde - theta * D_tilde)
@@ -23,11 +17,6 @@ def verify_plr_orthogonality(Y: np.ndarray, D: np.ndarray,
                               h_scale: float = 0.1,
                               n_directions: int = 10,
                               random_seed: int = 42) -> dict:
-    """
-    Verify Neyman orthogonality for PLR score.
-    Checks both nuisance directions: l(X) and m(X).
-    Each nuisance uses independent random perturbation directions.
-    """
     Y_j = jnp.asarray(Y, dtype=jnp.float32)
     D_j = jnp.asarray(D, dtype=jnp.float32)
     l_j = jnp.asarray(l_hat, dtype=jnp.float32)
@@ -38,7 +27,6 @@ def verify_plr_orthogonality(Y: np.ndarray, D: np.ndarray,
     derivs_l, derivs_m = [], []
 
     for _ in range(n_directions):
-        # independent direction for each nuisance
         h_l_np = rng.normal(size=n) * h_scale
         h_l_np = h_l_np - h_l_np.mean()
         h_l = jnp.array(h_l_np, dtype=jnp.float32)
@@ -71,14 +59,9 @@ def verify_plr_orthogonality(Y: np.ndarray, D: np.ndarray,
     }
 
 
-# ── IRM Score ────────────────────────────────────────────────────────────────
-
 def irm_score_full(theta: float, g0: jnp.ndarray, g1: jnp.ndarray,
                    m_hat: jnp.ndarray, Y: jnp.ndarray,
                    D: jnp.ndarray) -> float:
-    """
-    IRM doubly robust ATE score (Chernozhukov et al. 2018, Section 5.1).
-    """
     m_safe = jnp.clip(m_hat, 1e-3, 1 - 1e-3)
     psi = (g1 - g0
            + D * (Y - g1) / m_safe
@@ -94,11 +77,6 @@ def verify_irm_orthogonality(g0: np.ndarray, g1: np.ndarray,
                               h_scale: float = 0.01,
                               n_directions: int = 10,
                               random_seed: int = 42) -> dict:
-    """
-    Verify Neyman orthogonality for IRM score.
-    Checks all three nuisance directions: g0, g1, m(X).
-    Each nuisance uses independent random perturbation directions.
-    """
     g0_j = jnp.asarray(g0, dtype=jnp.float32)
     g1_j = jnp.asarray(g1, dtype=jnp.float32)
     m_j  = jnp.asarray(m_hat, dtype=jnp.float32)
@@ -110,7 +88,6 @@ def verify_irm_orthogonality(g0: np.ndarray, g1: np.ndarray,
     derivs_g0, derivs_g1, derivs_m = [], [], []
 
     for _ in range(n_directions):
-        # independent direction for each nuisance
         h_g0_np = rng.normal(size=n) * h_scale
         h_g0_np = h_g0_np - h_g0_np.mean()
         h_g0 = jnp.array(h_g0_np, dtype=jnp.float32)

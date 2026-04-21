@@ -7,14 +7,12 @@ from dml.learners.random_forest import RandomForestLearner, TunedRandomForestLea
 from dml.learners.neural_net import NeuralNetLearner, TunedNeuralNetLearner
 from dml.models.plr import PLR
 
-# baseline learners (Exp 2)
 LEARNERS_BASELINE = {
     "Lasso": LassoLearner,
     "RandomForest": RandomForestLearner,
     "NeuralNet": NeuralNetLearner,
 }
 
-# tuned learners (Exp 4)
 LEARNERS_TUNED = {
     "Lasso_tuned": TunedLassoLearner,
     "RandomForest_tuned": TunedRandomForestLearner,
@@ -39,17 +37,15 @@ def run_single_rep(learner_class, n_obs: int, alpha: float,
     plr = PLR(learner=learner_class(), n_splits=5, random_state=random_state)
     plr.fit(Y, D, X)
     results = plr.predict()
-
     theta = results['theta']
     ci_lower = results['ci_lower']
     ci_upper = results['ci_upper']
     covered = ci_lower < alpha < ci_upper
-
     return {
         "theta": theta,
         "covered": covered,
         "bias": theta - alpha,
-        "rmse": (theta - alpha) ** 2
+        "sq_error": (theta - alpha) ** 2
     }
 
 
@@ -62,28 +58,26 @@ def run_experiment_4(n_reps: int = 500,
     for learner_name, learner_class in learners.items():
         for n_obs in N_VALUES:
             print(f"[{learner_name}] n={n_obs}...")
-            biases, rmses, covered = [], [], []
-
+            biases, sq_errors, covered = [], [], []
             for rep in range(n_reps):
                 try:
                     res = run_single_rep(learner_class, n_obs, ALPHA,
                                         random_state=rep)
                     biases.append(res['bias'])
-                    rmses.append(res['rmse'])
+                    sq_errors.append(res['sq_error'])
                     covered.append(res['covered'])
                 except Exception:
                     continue
-
             records.append({
                 "learner": learner_name,
                 "n_obs": n_obs,
                 "bias": np.mean(biases),
-                "rmse": np.sqrt(np.mean(rmses)),
+                "rmse": np.sqrt(np.mean(sq_errors)),
                 "coverage": np.mean(covered),
                 "n_valid": len(biases)
             })
             print(f"  bias={np.mean(biases):.4f}, "
-                  f"rmse={np.sqrt(np.mean(rmses)):.4f}, "
+                  f"rmse={np.sqrt(np.mean(sq_errors)):.4f}, "
                   f"coverage={np.mean(covered):.3f}")
 
     return pd.DataFrame(records)
@@ -92,9 +86,6 @@ def run_experiment_4(n_reps: int = 500,
 def plot_experiment_4(df_baseline: pd.DataFrame,
                       df_tuned: pd.DataFrame,
                       save_path: str = None):
-    """
-    Plot baseline vs tuned comparison side by side.
-    """
     fig, axes = plt.subplots(2, 3, figsize=(15, 10))
 
     learner_colors = {
@@ -118,7 +109,6 @@ def plot_experiment_4(df_baseline: pd.DataFrame,
             ax = axes[row, col]
             for learner_name in df["learner"].unique():
                 color = learner_colors.get(learner_name, "gray")
-                # clean name for legend
                 display_name = learner_name.replace("_tuned", "")
                 subset = df[df["learner"] == learner_name]
                 ax.plot(subset["n_obs"], subset[metric],

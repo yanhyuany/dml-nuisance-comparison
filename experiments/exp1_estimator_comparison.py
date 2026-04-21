@@ -9,7 +9,7 @@ from dml.learners.random_forest import RandomForestLearner
 from dml.learners.neural_net import NeuralNetLearner
 from dml.learners.causal_forest import CausalForestLearner
 from dml.models.plr import PLR
-from dml.utils.variance import compute_variance, confidence_interval
+
 
 def generate_data(n_obs: int = 500, alpha: float = 0.5,
                   random_state: int = None):
@@ -32,7 +32,6 @@ def estimate_nonorthogonal(X, Y, D, learner):
 
 
 def estimate_dml_no_split(X, Y, D, learner):
-    # use separate instances to avoid state contamination
     learner_y = learner.__class__()
     learner_d = learner.__class__()
     Y_hat = learner_y.fit(X, Y).predict(X)

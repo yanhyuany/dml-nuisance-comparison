@@ -9,14 +9,12 @@ from dml.learners.neural_net import NeuralNetLearner
 from dml.learners.causal_forest import CausalForestLearner
 from dml.models.plr import PLR
 
-# main learners
 LEARNERS = {
     "Lasso": LassoLearner,
     "RandomForest": RandomForestLearner,
     "NeuralNet": NeuralNetLearner,
 }
 
-# appendix learners
 LEARNERS_APPENDIX = {
     "ElasticNet": ElasticNetLearner,
     "CausalForest": CausalForestLearner,
@@ -38,21 +36,18 @@ def generate_data(n_obs: int, alpha: float = ALPHA,
 def run_single_rep(learner_class, n_obs: int, alpha: float,
                    random_state: int) -> dict:
     X, Y, D = generate_data(n_obs, alpha, random_state)
-
     plr = PLR(learner=learner_class(), n_splits=5, random_state=random_state)
     plr.fit(Y, D, X)
     results = plr.predict()
-
     theta = results['theta']
     ci_lower = results['ci_lower']
     ci_upper = results['ci_upper']
     covered = ci_lower < alpha < ci_upper
-
     return {
         "theta": theta,
         "covered": covered,
         "bias": theta - alpha,
-        "rmse": (theta - alpha) ** 2
+        "sq_error": (theta - alpha) ** 2
     }
 
 
@@ -62,33 +57,29 @@ def run_experiment_2(n_reps: int = 500,
         learners = LEARNERS
 
     records = []
-
     for learner_name, learner_class in learners.items():
         for n_obs in N_VALUES:
             print(f"[{learner_name}] n={n_obs}...")
-
-            biases, rmses, covered = [], [], []
-
+            biases, sq_errors, covered = [], [], []
             for rep in range(n_reps):
                 try:
                     res = run_single_rep(learner_class, n_obs, ALPHA,
                                         random_state=rep)
                     biases.append(res['bias'])
-                    rmses.append(res['rmse'])
+                    sq_errors.append(res['sq_error'])
                     covered.append(res['covered'])
                 except Exception:
                     continue
-
             records.append({
                 "learner": learner_name,
                 "n_obs": n_obs,
                 "bias": np.mean(biases),
-                "rmse": np.sqrt(np.mean(rmses)),
+                "rmse": np.sqrt(np.mean(sq_errors)),
                 "coverage": np.mean(covered),
                 "n_valid": len(biases)
             })
             print(f"  bias={np.mean(biases):.4f}, "
-                  f"rmse={np.sqrt(np.mean(rmses)):.4f}, "
+                  f"rmse={np.sqrt(np.mean(sq_errors)):.4f}, "
                   f"coverage={np.mean(covered):.3f}")
 
     return pd.DataFrame(records)

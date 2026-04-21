@@ -1,12 +1,9 @@
 from abc import ABC, abstractmethod
 import numpy as np
 
+
 class BaseNuisanceLearner(ABC):
-    """
-    Abstract base class for all nuisance learners.
-    All learners must implement fit() and predict().
-    """
-    
+
     @abstractmethod
     def fit(self, X: np.ndarray, y: np.ndarray) -> "BaseNuisanceLearner":
         pass
