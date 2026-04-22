@@ -10,7 +10,6 @@ from dml.learners.causal_forest import CausalForestLearner
 
 @pytest.fixture
 def sample_data():
-    """Simple synthetic dataset for testing learners."""
     np.random.seed(66)
     n, p = 100, 5
     X = np.random.randn(n, p)
@@ -26,7 +25,6 @@ def sample_data():
     NeuralNetLearner(),
 ])
 def test_learner_is_base_instance(learner):
-    """All learners must be instances of BaseNuisanceLearner."""
     assert isinstance(learner, BaseNuisanceLearner)
 
 
@@ -38,7 +36,6 @@ def test_learner_is_base_instance(learner):
     NeuralNetLearner(),
 ])
 def test_learner_has_fit_predict(learner):
-    """All learners must have fit() and predict() methods."""
     assert hasattr(learner, "fit")
     assert hasattr(learner, "predict")
     assert hasattr(learner, "fit_predict")
@@ -52,7 +49,6 @@ def test_learner_has_fit_predict(learner):
     NeuralNetLearner(),
 ])
 def test_predict_output_shape(learner, sample_data):
-    """predict() must return a 1D array of shape (n,)."""
     X, y = sample_data
     learner.fit(X, y)
     y_pred = learner.predict(X)
@@ -66,7 +62,6 @@ def test_predict_output_shape(learner, sample_data):
     CausalForestLearner(),
 ])
 def test_fit_predict_reduces_error(learner, sample_data):
-    """Fitted learner should predict better than the mean baseline."""
     X, y = sample_data
     learner.fit(X, y)
     y_pred = learner.predict(X)
@@ -76,7 +71,6 @@ def test_fit_predict_reduces_error(learner, sample_data):
 
 
 def test_nn_fit_predict_runs(sample_data):
-    """NN only needs to run without error, return correct shape and finite values."""
     X, y = sample_data
     learner = NeuralNetLearner()
     learner.fit(X, y)
@@ -86,7 +80,6 @@ def test_nn_fit_predict_runs(sample_data):
 
 
 def test_fit_predict_method(sample_data):
-    """fit_predict() should return same shape as predict()."""
     X, y = sample_data
     X_train, X_test = X[:80], X[80:]
     y_train = y[:80]
