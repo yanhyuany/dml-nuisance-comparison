@@ -12,7 +12,12 @@ The framework is organized into three layers.
 
 ### Learner Layer
 
-Estimates nuisance functions g₀(X) = E[Y|X] and m₀(X) = E[D|X]. All learners inherit from `BaseNuisanceLearner` (abstract base class), which enforces a common `fit()` / `predict()` / `fit_predict()` interface.
+Estimates the nuisance functions required by each model.
+
+For PLR, the learners estimate l₀(X) = E[Y|X] and m₀(X) = E[D|X].
+For IRM, the nuisance functions are g(0,X), g(1,X), and m(X).
+
+All learners inherit from `BaseNuisanceLearner` (abstract base class), which enforces a common `fit()` / `predict()` / `fit_predict()` interface.
 
 | Learner | Class | Key Default Parameters |
 |---------|-------|------------------------|
