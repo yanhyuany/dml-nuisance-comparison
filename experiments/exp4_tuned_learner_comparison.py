@@ -62,12 +62,25 @@ def run_experiment_4(n_reps: int = 500,
             for rep in range(n_reps):
                 try:
                     res = run_single_rep(learner_class, n_obs, ALPHA,
-                                        random_state=rep)
+                                         random_state=rep)
                     biases.append(res['bias'])
                     sq_errors.append(res['sq_error'])
                     covered.append(res['covered'])
                 except Exception:
                     continue
+
+            if len(biases) == 0:
+                records.append({
+                    "learner": learner_name,
+                    "n_obs": n_obs,
+                    "bias": np.nan,
+                    "rmse": np.nan,
+                    "coverage": np.nan,
+                    "n_valid": 0
+                })
+                print("  all replications failed.")
+                continue
+
             records.append({
                 "learner": learner_name,
                 "n_obs": n_obs,

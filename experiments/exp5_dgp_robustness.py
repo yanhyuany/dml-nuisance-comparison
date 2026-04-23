@@ -99,6 +99,20 @@ def run_experiment_5(n_reps: int = N_REPS) -> pd.DataFrame:
                         covered.append(res['covered'])
                     except Exception:
                         continue
+
+                if len(biases) == 0:
+                    records.append({
+                        "dgp": dgp_name,
+                        "learner": learner_name,
+                        "n_obs": n_obs,
+                        "bias": np.nan,
+                        "rmse": np.nan,
+                        "coverage": np.nan,
+                        "n_valid": 0,
+                    })
+                    print("  all replications failed.")
+                    continue
+
                 records.append({
                     "dgp": dgp_name,
                     "learner": learner_name,

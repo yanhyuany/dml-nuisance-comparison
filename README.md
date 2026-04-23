@@ -2,13 +2,7 @@
 
 **Course:** ECON 622 — UBC | **Instructor:** Paul Schrimpf
 
-This project implements the Double Machine Learning (DML) framework from scratch, based on Chernozhukov et al. (2018). The goal is to study how learner choice, hyperparameter tuning, and DGP structure affect estimation quality in finite samples — using a controlled experimental setup that existing packages do not easily support.
-
----
-
-## Motivation
-
-Existing DML packages (e.g., DoubleML) are mature but hard to modify or verify at the component level. Specifically, they do not allow isolated testing of orthogonality, swapping cross-fitting strategies, or plugging in custom learners while holding all other conditions fixed. Building from scratch allows full control over each part of the pipeline, enabling systematic comparisons across learners under identical conditions.
+This project implements the Double Machine Learning (DML) framework from scratch, following the theoretical framework of Chernozhukov et al. (2018). Rather than relying on existing packages, the implementation builds each component as a modular, replaceable unit: the learner layer, the cross-fitting layer, and the score function. This design enables controlled comparisons of nuisance learner choice, hyperparameter configuration, and data-generating process structure on finite-sample estimation quality, in a way that standard implementations do not permit.
 
 ---
 
@@ -20,16 +14,16 @@ The framework is organized into three layers.
 
 Estimates nuisance functions g₀(X) = E[Y|X] and m₀(X) = E[D|X]. All learners inherit from `BaseNuisanceLearner` (abstract base class), which enforces a common `fit()` / `predict()` / `fit_predict()` interface.
 
-| Learner | Class | Default Parameters |
-|---------|-------|--------------------|
+| Learner | Class | Key Default Parameters |
+|---------|-------|------------------------|
 | Lasso | `LassoLearner` | alpha=0.1 |
-| Lasso (tuned) | `TunedLassoLearner` | LassoCV, cv=5 |
+| Lasso (tuned) | `TunedLassoLearner` | LassoCV (cv=5) |
 | Random Forest | `RandomForestLearner` | n_estimators=100, random_state=42 |
-| Random Forest (tuned) | `TunedRandomForestLearner` | GridSearchCV: max_depth∈{4,5,6}, max_features∈{0.3,0.5,0.7}, n_jobs=-1 |
-| Neural Network | `NeuralNetLearner` | hidden=[64,32], lr=1e-3, Adam, MSELoss, batch_size=64, early stopping (patience=10) |
-| Neural Network (tuned) | `TunedNeuralNetLearner` | Farrell et al. (2021) architecture: depth=floor(log n), width=floor(n^{1/(2+p/n)}), dropout=0.1 |
+| Random Forest (tuned) | `TunedRandomForestLearner` | GridSearchCV over max_depth∈{4,5,6}, max_features∈{0.3,0.5,0.7}, n_jobs=-1 |
+| Neural Network | `NeuralNetLearner` | hidden_sizes=[64,32], lr=1e-3, Adam, MSELoss, batch_size=64, early stopping (patience=10) |
+| Neural Network (tuned) | `TunedNeuralNetLearner` | Farrell-style architecture: depth=max(1, floor(log n)), width=max(8, floor(n^{1/(2+p/n)})), dropout=0.1 |
 | ElasticNet | `ElasticNetLearner` | alpha=0.1, l1_ratio=0.5 (appendix) |
-| CausalForest | `CausalForestLearner` | n_estimators=100, econml RegressionForest (appendix) |
+| CausalForest | `CausalForestLearner` | n_estimators=100, econml RegressionForest (used as nuisance learner, appendix) |
 
 All neural network learners use early stopping with a validation split (val_frac=0.1), random shuffle before splitting, and mini-batch training with batches randomly reshuffled each epoch. The TunedRandomForestLearner uses `n_jobs=-1` to parallelize the grid search across all available CPU cores.
 
@@ -39,7 +33,7 @@ Generates out-of-sample residuals to satisfy the sample-splitting requirement of
 
 - **`cross_fit`**: Standard K-fold cross-fitting. Each observation's prediction is made by a model trained on the other K-1 folds, ensuring every prediction is out-of-sample.
 - **`cross_fit_aggregated`**: Repeats cross-fitting `n_rep` times with different random fold assignments and averages predictions to reduce fold-assignment variance.
-- **`cross_fit_honest`**: Reserves 20% of data as a selection set for model selection, then runs standard cross-fitting on the remaining 80%. Separates model selection from estimation. The selection set receives the mean of the training predictions as a placeholder.
+- **`cross_fit_honest`**: Uses the first 20% of the data as a selection set to fit an auxiliary learner, separating this step from the main cross-fitting estimation on the remaining 80%. The selection set is not used for estimation; its predictions are filled with the mean of the training targets (y_rest) as a placeholder.
 
 ### Model Layer
 
@@ -59,12 +53,12 @@ where Ỹ = Y - ĝ(X) and D̃ = D - m̂(X) are cross-fitted residuals. θ̂ is t
 
 ```
 ψ(W; θ, η) = g(1,X) - g(0,X) + D(Y - g(1,X))/m(X) - (1-D)(Y - g(0,X))/(1-m(X)) - θ
-θ̂ = -E[ψ_b] / E[ψ_a],  where ψ_a = -1
+θ̂ = E[ψ_b]
 ```
 
-Three nuisance functions are cross-fitted separately using the same fold structure: g(0,X) = E[Y|D=0,X], g(1,X) = E[Y|D=1,X], m(X) = P(D=1|X). Propensity scores are clipped to [0.01, 0.99] to prevent division by zero. The clipping bounds are chosen to be conservative — wide enough to avoid numerical instability while not discarding too much variation in the propensity score.
+Three nuisance functions are cross-fitted separately using the same fold structure: g(0,X) = E[Y|D=0,X], g(1,X) = E[Y|D=1,X], m(X) = P(D=1|X). Propensity scores are clipped to [1e-3, 1 - 1e-3] to avoid extreme inverse probability weights and improve numerical stability. The clipping bounds are chosen to be conservative, wide enough to avoid numerical instability while not discarding too much variation in the propensity score.
 
-Variance is estimated via the influence function: V̂ = (1/J²) · E[ψ²] / n, where J = E[D̃²] for PLR and J = E[ψ_a] = -1 for IRM. 95% confidence intervals use the normal approximation with z = 1.96.
+Variance is estimated via the influence function: V̂ = (1 / (n · J²)) · ∑ ψᵢ², where J = E[D̃²] for PLR and J = E[ψ_a] = -1 for IRM. 95% confidence intervals use the normal approximation with z = 1.96.
 
 ---
 
@@ -87,13 +81,13 @@ This is repeated over 10 independent random directions per nuisance function. Re
 
 ### DoubleML Benchmark
 
-PLR estimates compared against the official DoubleML package on the CCDDHNR2018 DGP (n=500, dim_x=20, alpha=0.5, LassoLearner). Difference in θ̂ < 0.01 ✅
+PLR estimates are compared against the official DoubleML package on the CCDDHNR2018 DGP (n=500, dim_x=20, alpha=0.5, LassoLearner). Difference in θ̂ < 0.01 ✅
 
-IRM benchmark uses a regressor with output clipped to [0.01, 0.99] for propensity score estimation, while the official DoubleML package uses a separate classifier. Results may therefore not be fully attributed to implementation correctness alone.
+IRM benchmark uses a regressor with output clipped to [1e-3, 1 - 1e-3] for propensity score estimation, while the official DoubleML package uses a separate classifier. Results may therefore not be fully attributed to implementation correctness alone.
 
 ### Semiparametric Efficiency Bound
 
-Estimated variance compared against the theoretical lower bound V* = σ²/J²/n. Also verified using JAX-based automatic differentiation to compute the Jacobian J independently.
+Estimated variance compared against the theoretical lower bound V* = σ²/J²/n. Also verified using JAX-based automatic differentiation to compute J via automatic differentiation of the score function.
 
 ---
 
@@ -105,11 +99,11 @@ All experiments use `random_state=66` as the default seed. Monte Carlo replicati
 
 Compares three estimators on the same DGP (n=500, 500 Monte Carlo replications):
 
-- **Non-orthogonal ML**: in-sample prediction, no partialling-out
-- **DML without sample splitting**: orthogonalization but in-sample nuisance estimation
+- **Non-orthogonal ML**: direct in-sample ML regression of Y on (D, X), without orthogonalization or sample splitting
+- **DML without sample splitting**: orthogonalization with in-sample nuisance estimation
 - **DML with cross-fitting**: full implementation
 
-Each estimator produces a standardized statistic (θ̂ - θ₀)/σ̂, plotted against the N(0,1) reference. Lasso bias in the non-orthogonal case comes from two sources: λ regularization and model misspecification (linear model cannot fit nonlinear g₀). NN improves most dramatically from no-split to cross-fitting, consistent with higher overfitting risk.
+Each estimator produces a standardized statistic \((\hat{\theta} - \theta_0)/\widehat{se}(\hat{\theta})\), plotted against the \(N(0,1)\) reference.
 
 ### Experiment 2 — Learner Comparison (Default Hyperparameters)
 
@@ -117,18 +111,25 @@ Compares Lasso, Random Forest, and Neural Network across n ∈ {200, 500, 1000, 
 
 ### Experiment 3 — Convergence Rate Analysis
 
-Quantifies nuisance RMSE and θ̂ RMSE as a function of n ∈ {200, 500, 1000, 2000, 5000} on a log-log scale (100 replications). Uses the known true nuisance functions of the CCDDHNR2018 DGP:
+Quantifies nuisance RMSE and θ̂ RMSE as functions of n ∈ {200, 500, 1000, 2000, 5000} on a log-log scale (100 replications).
 
-```
-g₀(X) = exp(X₁)/(1+exp(X₁)) + 0.25·X₃
+For PLR, nuisance convergence is evaluated for:
+
+l₀(X) = E[Y|X] = g₀(X) + θ₀ m₀(X)  
+m₀(X) = E[D|X]
+
+using the known structural components of the CCDDHNR2018 DGP:
+
+g₀(X) = exp(X₁)/(1+exp(X₁)) + 0.25·X₃  
 m₀(X) = X₁ + 0.25·exp(X₃)/(1+exp(X₃))
-```
 
-Convergence slope estimated via log-log OLS. Theory predicts nuisance slope < -0.25 (o(n^{-1/4})) and θ̂ slope ≈ -0.5 (n^{-1/2}). Observed θ̂ slopes range from -0.40 to -0.47 across learners, consistent with theory. Nuisance slopes for g₀ are near zero, reflecting that the nonlinear DGP and the finite n range place learners outside the asymptotic regime for this nuisance function.
+Convergence slopes are estimated via log-log OLS. DML theory requires nuisance estimation error to converge faster than n^{-1/4}, while θ̂ is expected to approach n^{-1/2} behavior asymptotically.
+
+Observed θ̂ slopes range from -0.40 to -0.47 across learners, broadly consistent with the theory. The relatively weak convergence for the l₀(X) component reflects the nonlinear DGP and the limited sample range, suggesting that this nuisance component remains outside the asymptotic regime in finite samples.
 
 ### Experiment 4 — Tuned Learner Comparison
 
-Repeats Experiment 2 with tuned hyperparameters. Compares baseline vs tuned side-by-side (2×3 subplot grid). Hyperparameter tuning yields minimal improvement on RMSE but provides some improvement on CI coverage, particularly for Random Forest at large n.
+Repeats Experiment 2 with tuned hyperparameters. Compares baseline versus tuned learners side-by-side in a 2×3 subplot grid, allowing changes in bias, RMSE, and CI coverage to be assessed across sample sizes.
 
 ### Experiment 5 — DGP Robustness
 
@@ -140,7 +141,7 @@ Tests whether learner rankings hold across three DGPs designed to favor differen
 | Piecewise | p=20, indicator functions | Random Forest |
 | Nonlinear Interaction | p=20, sin/tanh/exp interactions | Neural Network |
 
-Learner-DGP mismatch causes RMSE to increase by 4-5x and CI coverage to drop well below 95%, confirming that DML's n^{-1/2} guarantee for θ̂ depends critically on nuisance estimation quality.
+Learner-DGP mismatch leads to substantially higher RMSE and weaker CI coverage, highlighting that DML’s finite-sample performance depends critically on nuisance estimation quality and learner-DGP alignment.
 
 ---
 
@@ -172,6 +173,15 @@ dml-nuisance-comparison/
 
 ---
 
+## Notebook
+
+`notebooks/demo.ipynb` contains a walkthrough of the full experimental pipeline, including:
+- Framework verification (orthogonality checks, DoubleML benchmark, efficiency bound)
+- All five experiments with result figures
+- Brief interpretation of each experiment
+
+---
+
 ## Installation
 
 ```bash
@@ -182,13 +192,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Key dependencies: `numpy`, `scikit-learn`, `torch`, `jax`, `econml`, `doubleml`, `matplotlib`, `pandas`.
+Main dependencies include `numpy`, `scikit-learn`, `torch`, `jax`, `econml`, `doubleml`, `matplotlib`, `pandas`.
 
 ---
 
 ## Reproducibility
 
-All experiments use `random_state=66` as the default seed. Monte Carlo replications use `random_state=rep` (0-indexed) for both data generation and PLR/IRM fitting, ensuring each replication is independently reproducible.
+All experiments use `random_state=66` as the default seed when a fixed seed is needed. Monte Carlo replications use `random_state=rep` (0-indexed) for both data generation and PLR/IRM fitting, so each replication is independently reproducible.
 
 ---
 
@@ -198,7 +208,7 @@ All experiments use `random_state=66` as the default seed. Monte Carlo replicati
 pytest tests/ -v
 ```
 
-59 tests across 5 files covering learner API, PLR, IRM, cross-fitting utilities, and CausalForest.
+Tests cover the learner API, PLR, IRM, cross-fitting utilities, and CausalForest components.
 
 ---
 
@@ -215,10 +225,10 @@ plot_experiment_2(df, save_path='results/exp2_learner_comparison.png')
 
 ## Future Work
 
-- Honest cross-fitting: compare `cross_fit_honest` vs standard `cross_fit` on coverage
-- CausalForest honesty mechanism: test whether `honest=True` adds value within DML cross-fitting
+- Honest cross-fitting: compare `cross_fit_honest` with standard `cross_fit` in terms of coverage and finite-sample stability
+- CausalForest honesty mechanism: test whether `honest=True` adds value within the outer DML cross-fitting loop
 - IRM benchmark with classifier-based propensity score estimation
-- Orthogonality verification using true nuisance functions to isolate the score's mathematical property from estimation noise
+- Orthogonality verification using true nuisance functions to isolate the mathematical property of the score from nuisance estimation noise
 
 ---
 

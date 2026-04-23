@@ -9,6 +9,7 @@ from dml.learners.random_forest import RandomForestLearner
 from dml.learners.neural_net import NeuralNetLearner
 from dml.learners.causal_forest import CausalForestLearner
 from dml.models.plr import PLR
+from copy import deepcopy
 
 
 def generate_data(n_obs: int = 500, alpha: float = 0.5,
@@ -21,19 +22,27 @@ def generate_data(n_obs: int = 500, alpha: float = 0.5,
 
 
 def estimate_nonorthogonal(X, Y, D, learner):
-    g_hat = learner.fit(X, Y).predict(X)
-    Y_res = Y - g_hat
-    theta = np.sum(D * Y_res) / np.sum(D * D)
-    psi = D * (Y_res - D * theta)
-    J = np.mean(D ** 2)
-    var = np.mean(psi ** 2) / (J ** 2) / len(Y)
+    DX = np.column_stack([D, X])
+    learner.fit(DX, Y)
+
+    DX1 = DX.copy()
+    DX0 = DX.copy()
+    DX1[:, 0] = 1.0
+    DX0[:, 0] = 0.0
+
+    mu1 = learner.predict(DX1)
+    mu0 = learner.predict(DX0)
+    theta = np.mean(mu1 - mu0)
+
+    psi = (mu1 - mu0) - theta
+    var = np.mean(psi ** 2) / len(Y)
     se = np.sqrt(var)
     return theta, se
 
 
 def estimate_dml_no_split(X, Y, D, learner):
-    learner_y = learner.__class__()
-    learner_d = learner.__class__()
+    learner_y = deepcopy(learner)
+    learner_d = deepcopy(learner)
     Y_hat = learner_y.fit(X, Y).predict(X)
     D_hat = learner_d.fit(X, D).predict(X)
     D_tilde = D - D_hat
