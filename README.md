@@ -1,6 +1,6 @@
 # DML from Scratch: A Controlled Comparison of Nuisance Learners
 
-**Course:** ECON 622 — UBC | **Instructor:** Paul Schrimpf
+**Course:** ECON 622 — UBC | **Student Name:** Haoyuan Yan
 
 This project implements the Double Machine Learning (DML) framework from scratch, following the theoretical framework of Chernozhukov et al. (2018). Rather than relying on existing packages, the implementation builds each component as a modular, replaceable unit: the learner layer, the cross-fitting layer, and the score function. This design enables controlled comparisons of nuisance learner choice, hyperparameter configuration, and data-generating process structure on finite-sample estimation quality, in a way that standard implementations do not permit.
 
